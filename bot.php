@@ -7,10 +7,10 @@ use App\Model\ContentModel;
 use App\Model\SubscriberModel;
 use App\Controller\BotController;
 
-require 'vendor/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
 // Загружаем конфиг
-$config = require 'config.php';
+$config = require __DIR__ . '/config.php';
 
 // Инициализация Моделей
 $calendar = new CalendarModel($config['fixed_holidays']);

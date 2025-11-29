@@ -1,0 +1,37 @@
+# Защита конфигурационных файлов
+<Files "config.php">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Защита скрипта установки webhook (после использования рекомендуется удалить)
+<Files "set_webhook.php">
+    # Раскомментируйте следующую строку после установки webhook для защиты:
+    # Order allow,deny
+    # Deny from all
+</Files>
+
+# Защита папки storage от прямого доступа
+<DirectoryMatch "^.*/storage/">
+    Order allow,deny
+    Deny from all
+</DirectoryMatch>
+
+# Защита composer файлов
+<FilesMatch "^(composer\.(json|lock)|composer\.phar)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Настройки PHP (если разрешено)
+<IfModule mod_php.c>
+    php_value max_execution_time 300
+    php_value memory_limit 256M
+</IfModule>
+
+# Кодировка по умолчанию
+AddDefaultCharset UTF-8
+
+# Защита от просмотра директорий
+Options -Indexes
+

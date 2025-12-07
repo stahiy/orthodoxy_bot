@@ -35,3 +35,5 @@ AddDefaultCharset UTF-8
 # Защита от просмотра директорий
 Options -Indexes
 
+
+

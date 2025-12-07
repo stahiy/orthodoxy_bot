@@ -26,10 +26,15 @@ require __DIR__ . '/vendor/autoload.php';
 // 1. Загружаем конфиг
 $config = require __DIR__ . '/config.php';
 
+// Загружаем данные из отдельных файлов
+$fixedHolidays = require $config['paths']['fixed_holidays_file'];
+$prayers = require $config['paths']['prayers_file'];
+$quotes = require $config['paths']['quotes_file'];
+
 // 2. Инициализация моделей
-$calendar = new CalendarModel($config['fixed_holidays']);
+$calendar = new CalendarModel($fixedHolidays);
 $subscribers = new SubscriberModel($config['paths']);
-$content = new ContentModel($config['prayers'], $config['quotes']);
+$content = new ContentModel($prayers, $quotes);
 
 // 3. Инициализация контроллера — ДО бота!
 $controller = new BotController($calendar, $content, $subscribers);

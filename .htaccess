@@ -17,6 +17,12 @@
     Deny from all
 </DirectoryMatch>
 
+# Защита папки data от прямого доступа
+<DirectoryMatch "^.*/data/">
+    Order allow,deny
+    Deny from all
+</DirectoryMatch>
+
 # Защита composer файлов
 <FilesMatch "^(composer\.(json|lock)|composer\.phar)$">
     Order allow,deny

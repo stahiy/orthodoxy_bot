@@ -24,14 +24,32 @@ class ContentModel
         private array $quotes
     ) {}
 
-    public function getRandomPrayer(): array
+    /**
+     * Получает случайную молитву
+     * 
+     * @param string $lang Язык молитвы: 'русский' или 'цс' (церковнославянский). По умолчанию 'русский'
+     * @return array ['title' => string|null, 'text' => string]
+     */
+    public function getRandomPrayer(string $lang = 'русский'): array
     {
         if (empty($this->prayers)) {
             return ['title' => null, 'text' => "Список молитв пуст."];
         }
 
-        $title = array_rand($this->prayers);
-        $text = $this->prayers[$title];
+        // Выбираем случайную молитву
+        $randomIndex = array_rand($this->prayers);
+        $prayer = $this->prayers[$randomIndex];
+
+        // Получаем название
+        $title = $prayer['name'] ?? null;
+        
+        // Получаем текст на выбранном языке, если нет - берем русский
+        $text = $prayer['data'][$lang] ?? $prayer['data']['русский'] ?? '';
+        
+        // Если текст пустой, возвращаем сообщение об ошибке
+        if (empty($text)) {
+            return ['title' => $title, 'text' => "Текст молитвы не найден."];
+        }
 
         return ['title' => $title, 'text' => $text];
     }
@@ -56,6 +74,9 @@ class ContentModel
         return $this->quotes[array_rand($this->quotes)];
     }
 
+    /**
+     * @return string|null
+     */
     private function fetchFromApi(): ?string
     {
         try {

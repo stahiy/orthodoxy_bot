@@ -17,6 +17,7 @@ class BotView
             "Команды:\n" .
             "/pray — Случайная молитва\n" .
             "/quote — Цитата из Библии\n" .
+            "/saint — Цитата святого (или /saint Имя)\n" .
             "/holiday — Какой сегодня праздник?\n" .
             "/subscribe — Подписаться на ежедневные уведомления\n" .
             "/unsubscribe — Отписаться от уведомлений"
@@ -37,9 +38,21 @@ class BotView
         $this->bot->sendMessage(text: "🙏 *{$title}*\n\n{$text}", parse_mode: 'Markdown');
     }
 
-    public function sendQuote(string $quote): void
+    /**
+     * Отправка цитаты (из Библии или от святого)
+     * 
+     * @param array $quote Массив с ключами 'name' (автор, опционально) и 'text' (текст цитаты)
+     */
+    public function sendQuote(array $quote): void
     {
-        $this->bot->sendMessage(text: "📖 {$quote}");
+        $text = "📖 {$quote['text']}";
+        
+        // Если есть автор (для цитат святых), добавляем его в конец
+        if (!empty($quote['name'])) {
+            $text .= "\n\n— *{$quote['name']}*";
+        }
+        
+        $this->bot->sendMessage(text: $text, parse_mode: 'Markdown');
     }
 
     public function sendMessage(string $text, int $chatId): void

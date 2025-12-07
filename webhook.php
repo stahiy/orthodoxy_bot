@@ -50,6 +50,7 @@ $bot->onCommand('start', [$controller, 'start']);
 $bot->onCommand('holiday', [$controller, 'holiday']);
 $bot->onCommand('pray', [$controller, 'pray']);
 $bot->onCommand('quote', [$controller, 'quote']);
+$bot->onCommand('saint', [$controller, 'saint']);
 $bot->onCommand('subscribe', [$controller, 'subscribe']);
 $bot->onCommand('unsubscribe', [$controller, 'unsubscribe']);
 

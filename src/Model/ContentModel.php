@@ -55,23 +55,113 @@ class ContentModel
     }
 
     /**
-     * Получает случайную цитату:
+     * Получает случайную цитату из Библии:
      * 1. Сначала пробует загрузить случайный стих через Bible API.
-     * 2. Если не удалось (ошибка сети), берет из локального конфига.
+     * 2. Если не удалось (ошибка сети), возвращает сообщение об ошибке.
+     * 
+     * @return array ['name' => null, 'text' => string] - цитата из Библии без автора
      */
-    public function getRandomQuote(): string
+    public function getRandomQuote(): array
     {
+        // Пробуем получить цитату из Bible API
         $apiQuote = $this->fetchFromApi();
-        
         if ($apiQuote) {
-            return $apiQuote;
+            return [
+                'name' => null,
+                'text' => $apiQuote
+            ];
         }
         
-        // Fallback на локальные цитаты
+        // Если API не доступен, возвращаем сообщение об ошибке
+        return [
+            'name' => null,
+            'text' => "Не удалось загрузить цитату из Библии. Попробуйте позже."
+        ];
+    }
+
+    /**
+     * Получает список всех уникальных святых из цитат
+     * 
+     * @return array Массив имен святых
+     */
+    public function getSaintsList(): array
+    {
         if (empty($this->quotes)) {
-            return "Список цитат пуст.";
+            return [];
         }
-        return $this->quotes[array_rand($this->quotes)];
+
+        $saints = [];
+        foreach ($this->quotes as $quote) {
+            if (is_array($quote) && isset($quote['name']) && !empty($quote['name'])) {
+                $saintName = $quote['name'];
+                if (!in_array($saintName, $saints, true)) {
+                    $saints[] = $saintName;
+                }
+            }
+        }
+
+        return $saints;
+    }
+
+    /**
+     * Получает случайную цитату святого
+     * 
+     * @param string|null $saintName Имя святого (опционально). Если не указано - случайный святой
+     * @return array ['name' => string, 'text' => string] или ['name' => null, 'text' => string] для ошибок
+     */
+    public function getSaintQuote(?string $saintName = null): array
+    {
+        if (empty($this->quotes)) {
+            return [
+                'name' => null,
+                'text' => "Список цитат пуст."
+            ];
+        }
+
+        // Фильтруем цитаты по имени святого, если указано
+        $filteredQuotes = [];
+        if ($saintName !== null && $saintName !== '') {
+            $saintNameLower = mb_strtolower(trim($saintName));
+            foreach ($this->quotes as $quote) {
+                if (is_array($quote) && isset($quote['name']) && isset($quote['text'])) {
+                    $quoteNameLower = mb_strtolower($quote['name']);
+                    // Поиск по частичному совпадению
+                    if (mb_strpos($quoteNameLower, $saintNameLower) !== false) {
+                        $filteredQuotes[] = $quote;
+                    }
+                }
+            }
+
+            if (empty($filteredQuotes)) {
+                return [
+                    'name' => null,
+                    'text' => "Цитаты святого '{$saintName}' не найдены."
+                ];
+            }
+        } else {
+            // Берем все цитаты святых (исключаем цитаты без имени)
+            foreach ($this->quotes as $quote) {
+                if (is_array($quote) && isset($quote['name']) && isset($quote['text']) && !empty($quote['name'])) {
+                    $filteredQuotes[] = $quote;
+                }
+            }
+
+            if (empty($filteredQuotes)) {
+                return [
+                    'name' => null,
+                    'text' => "Цитаты святых не найдены."
+                ];
+            }
+        }
+
+        // Выбираем случайную цитату из отфильтрованных
+        $randomIndex = array_rand($filteredQuotes);
+        $quote = $filteredQuotes[$randomIndex];
+
+        return [
+            'name' => $quote['name'],
+            'text' => $quote['text']
+        ];
     }
 
     /**

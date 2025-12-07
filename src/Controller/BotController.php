@@ -56,6 +56,46 @@ class BotController
         $view->sendQuote($quote);
     }
 
+    /**
+     * Команда для получения цитаты святого
+     * Использование: /saint или /saint Иоанн Кронштадтский
+     */
+    public function saint(Nutgram $bot): void
+    {
+        // Отправляем действие "печатает"
+        $bot->sendChatAction('typing');
+
+        // Получаем аргумент команды (имя святого)
+        $message = $bot->message();
+        $text = $message?->text ?? '';
+        
+        // Убираем команду /saint из начала текста
+        $saintName = null;
+        if (preg_match('/^\/saint\s+(.+)$/i', $text, $matches)) {
+            $saintName = trim($matches[1]);
+        }
+
+        // Получаем цитату святого
+        $quote = $this->content->getSaintQuote($saintName);
+
+        $view = new BotView($bot);
+        
+        // Если цитата не найдена, отправляем сообщение об ошибке
+        if ($quote['name'] === null && strpos($quote['text'], 'не найдены') !== false) {
+            $saintsList = $this->content->getSaintsList();
+            $messageText = "❌ {$quote['text']}";
+            
+            if (!empty($saintsList)) {
+                $messageText .= "\n\n📿 Доступные святые:\n" . 
+                    implode("\n", array_map(fn($s) => "• {$s}", $saintsList));
+            }
+            
+            $bot->sendMessage($messageText);
+        } else {
+            $view->sendQuote($quote);
+        }
+    }
+
     public function subscribe(Nutgram $bot): void
     {
         $added = $this->subscribers->addSubscriber($bot->chatId());

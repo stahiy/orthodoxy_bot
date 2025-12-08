@@ -335,6 +335,13 @@ class ContentModel
             
             // Проходим по всем книгам
             foreach ($xml->BIBLEBOOK as $book) {
+                // Пропускаем книги Ветхого Завета (bnumber < 40)
+                // Оставляем только Новый Завет (начиная с bnumber = 40)
+                $bookNumber = (int)$book['bnumber'];
+                if ($bookNumber < 40) {
+                    continue;
+                }
+                
                 $bookName = (string)$book['bname'];
                 
                 // Проходим по всем главам

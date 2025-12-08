@@ -19,7 +19,7 @@ class BotController
     public function start(Nutgram $bot): void
     {
         $this->subscribers->addSubscriber($bot->chatId());
-        
+
         $view = new BotView($bot);
         $view->sendWelcome();
     }
@@ -27,7 +27,7 @@ class BotController
     public function holiday(Nutgram $bot): void
     {
         $holiday = $this->calendar->getHoliday();
-        
+
         $view = new BotView($bot);
         $view->sendHoliday($holiday);
     }
@@ -35,7 +35,7 @@ class BotController
     public function pray(Nutgram $bot): void
     {
         $prayer = $this->content->getRandomPrayer();
-        
+
         $view = new BotView($bot);
         // $prayer is ['title' => ..., 'text' => ...]
         if ($prayer['title'] === null) {
@@ -49,9 +49,8 @@ class BotController
     {
         // Отправляем действие "печатает", пока грузится цитата
         $bot->sendChatAction('typing');
-        
+
         $quote = $this->content->getRandomQuote();
-        
         $view = new BotView($bot);
         $view->sendQuote($quote);
     }
@@ -68,7 +67,7 @@ class BotController
         // Получаем аргумент команды (имя святого)
         $message = $bot->message();
         $text = $message?->text ?? '';
-        
+
         // Убираем команду /saint из начала текста
         $saintName = null;
         if (preg_match('/^\/saint\s+(.+)$/i', $text, $matches)) {
@@ -79,17 +78,17 @@ class BotController
         $quote = $this->content->getSaintQuote($saintName);
 
         $view = new BotView($bot);
-        
+
         // Если цитата не найдена, отправляем сообщение об ошибке
         if ($quote['name'] === null && strpos($quote['text'], 'не найдены') !== false) {
             $saintsList = $this->content->getSaintsList();
             $messageText = "❌ {$quote['text']}";
-            
+
             if (!empty($saintsList)) {
-                $messageText .= "\n\n📿 Доступные святые:\n" . 
+                $messageText .= "\n\n📿 Доступные святые:\n" .
                     implode("\n", array_map(fn($s) => "• {$s}", $saintsList));
             }
-            
+
             $bot->sendMessage($messageText);
         } else {
             $view->sendQuote($quote);
@@ -99,7 +98,7 @@ class BotController
     public function subscribe(Nutgram $bot): void
     {
         $added = $this->subscribers->addSubscriber($bot->chatId());
-        
+
         if ($added) {
             $bot->sendMessage("✅ Вы подписались на ежедневные уведомления о православных праздниках и цитатах из Библии.");
         } else {
@@ -110,7 +109,7 @@ class BotController
     public function unsubscribe(Nutgram $bot): void
     {
         $removed = $this->subscribers->removeSubscriber($bot->chatId());
-        
+
         if ($removed) {
             $bot->sendMessage("❌ Вы отписались от ежедневных уведомлений.");
         } else {

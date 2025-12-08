@@ -55,27 +55,58 @@ class ContentModel
     }
 
     /**
-     * Получает случайную цитату из Библии:
-     * 1. Сначала пробует загрузить случайный стих через Bible API.
-     * 2. Если не удалось (ошибка сети), возвращает сообщение об ошибке.
+     * Получает случайную цитату из Библии из XML файла:
+     * 1. Использует индексный файл для быстрого доступа
+     * 2. Читает только нужный стих из JSON Lines файла (не загружает весь файл)
      * 
-     * @return array ['name' => null, 'text' => string] - цитата из Библии без автора
+     * @return array ['name' => null, 'text' => string] - цитата из Библии
      */
     public function getRandomQuote(): array
     {
-        // Пробуем получить цитату из Bible API
-        $apiQuote = $this->fetchFromApi();
-        if ($apiQuote) {
+        $xmlPath = __DIR__ . '/../../storage/rus-synodal.zefania.xml';
+        $jsonlPath = __DIR__ . '/../../storage/bible_verses.jsonl';
+        $indexPath = __DIR__ . '/../../storage/bible_index.json';
+        
+        // Проверяем существование XML файла
+        if (!file_exists($xmlPath)) {
             return [
                 'name' => null,
-                'text' => $apiQuote
+                'text' => "Файл Библии не найден."
             ];
         }
         
-        // Если API не доступен, возвращаем сообщение об ошибке
+        // Инициализируем кэш (если нужно)
+        $this->ensureBibleCache($xmlPath, $jsonlPath, $indexPath);
+        
+        // Загружаем индекс (легкий файл, ~1 КБ)
+        $index = $this->loadIndex($indexPath);
+        if (empty($index) || empty($index['count']) || $index['count'] <= 0) {
+            return [
+                'name' => null,
+                'text' => "Не удалось загрузить индекс Библии."
+            ];
+        }
+        
+        // Выбираем случайный номер стиха (от 0 до count-1)
+        $randomVerseNumber = rand(0, $index['count'] - 1);
+        
+        // Загружаем только нужный стих из JSON Lines (читаем только одну строку)
+        $verse = $this->loadVerseByIndex($jsonlPath, $randomVerseNumber);
+        
+        if (empty($verse)) {
+            return [
+                'name' => null,
+                'text' => "Не удалось загрузить стих."
+            ];
+        }
+        
+        // Формируем текст цитаты
+        $text = $verse['text'];
+        $reference = "{$verse['book']} {$verse['chapter']}:{$verse['verse']}";
+        
         return [
             'name' => null,
-            'text' => "Не удалось загрузить цитату из Библии. Попробуйте позже."
+            'text' => $text . "\n\n(" . $reference . ")"
         ];
     }
 
@@ -165,49 +196,176 @@ class ContentModel
     }
 
     /**
-     * @return string|null
+     * Инициализирует кэш: парсит XML и создает JSON Lines + индекс
+     * 
+     * @param string $xmlPath Путь к XML файлу
+     * @param string $jsonlPath Путь к JSON Lines файлу
+     * @param string $indexPath Путь к индексному файлу
      */
-    private function fetchFromApi(): ?string
+    private function ensureBibleCache(string $xmlPath, string $jsonlPath, string $indexPath): void
     {
+        // Если кэш существует и свежий - ничего не делаем
+        if (file_exists($jsonlPath) && file_exists($indexPath)) {
+            $jsonlMtime = filemtime($jsonlPath);
+            $xmlMtime = filemtime($xmlPath);
+            
+            // Проверяем, что кэш новее XML файла
+            if ($jsonlMtime >= $xmlMtime) {
+                return;
+            }
+        }
+        
+        // Парсим XML и создаем кэш
+        $verses = $this->parseBibleXml($xmlPath);
+        
+        if (empty($verses)) {
+            return;
+        }
+        
+        // Сохраняем в JSON Lines формат (каждая строка = один JSON объект)
+        $this->saveVersesAsJsonLines($verses, $jsonlPath);
+        
+        // Сохраняем индекс (только метаданные)
+        $index = [
+            'count' => count($verses),
+            'created_at' => time(),
+            'xml_mtime' => filemtime($xmlPath)
+        ];
+        
+        file_put_contents(
+            $indexPath,
+            json_encode($index, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        );
+    }
+
+    /**
+     * Загружает индексный файл
+     * 
+     * @param string $indexPath Путь к индексному файлу
+     * @return array Массив с метаданными ['count' => int, 'created_at' => int, ...]
+     */
+    private function loadIndex(string $indexPath): array
+    {
+        if (!file_exists($indexPath)) {
+            return [];
+        }
+        
+        $content = file_get_contents($indexPath);
+        $index = json_decode($content, true);
+        
+        return is_array($index) ? $index : [];
+    }
+
+    /**
+     * Загружает конкретный стих по индексу из JSON Lines файла
+     * Читает только нужную строку, не загружая весь файл в память
+     * 
+     * @param string $jsonlPath Путь к JSON Lines файлу
+     * @param int $index Номер строки (начиная с 0)
+     * @return array|null Массив стиха ['book' => string, 'chapter' => int, 'verse' => int, 'text' => string] или null
+     */
+    private function loadVerseByIndex(string $jsonlPath, int $index): ?array
+    {
+        if (!file_exists($jsonlPath)) {
+            return null;
+        }
+        
         try {
-            // Выбираем случайную книгу
-            $book = array_rand(self::BIBLE_BOOKS);
-            $maxChapter = self::BIBLE_BOOKS[$book];
+            $file = new \SplFileObject($jsonlPath, 'r');
             
-            // Выбираем случайную главу
-            $chapter = rand(1, $maxChapter);
+            // Переходим к нужной строке (индекс = номер строки)
+            $file->seek($index);
             
-            // Формируем запрос (берем всю главу или первые стихи, API вернет случайный стих если указать random, но bible-api.com работает по ссылкам)
-            // bible-api.com/Matthew+5?translation=rus-synodal вернет всю главу. Это много.
-            // Лучше запросить случайный стих. Но API bible-api.com требует точной ссылки.
-            // Есть эндпоинт /random, но он выдает на английском по умолчанию, перевод там ограничен.
-            // Поэтому сделаем хитрее: запросим конкретную главу и выберем из ответа случайный стих (или несколько).
-            // Или проще: будем запрашивать конкретный стих, например, 1. (Почти во всех главах есть стих 1)
-            // Чтобы было интереснее, попробуем угадать стих. В среднем в главе 20-30 стихов.
-            $verse = rand(1, 20);
+            // Читаем текущую строку
+            $line = $file->current();
             
-            $url = "https://bible-api.com/{$book}+{$chapter}:{$verse}?translation=rus-synodal";
-            
-            // Используем file_get_contents с таймаутом
-            $ctx = stream_context_create(['http' => ['timeout' => 3]]);
-            $response = @file_get_contents($url, false, $ctx);
-            
-            if (!$response) {
+            if ($line === false || $line === '') {
                 return null;
             }
-
-            $data = json_decode($response, true);
-            if (!isset($data['text'])) {
-                return null;
-            }
-
-            // Формируем красивый ответ
-            // data['reference'] содержит ссылку (например, Иоанна 3:16)
-            // data['text'] содержит текст
-            return trim($data['text']) . "\n\n(" . $data['reference'] . ")";
-
+            
+            // Декодируем JSON из строки
+            $verse = json_decode(trim($line), true);
+            
+            return is_array($verse) ? $verse : null;
+            
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Сохраняет стихи в JSON Lines формат (каждая строка = один JSON объект)
+     * 
+     * @param array $verses Массив стихов
+     * @param string $jsonlPath Путь к файлу для сохранения
+     */
+    private function saveVersesAsJsonLines(array $verses, string $jsonlPath): void
+    {
+        $file = fopen($jsonlPath, 'w');
+        
+        if ($file === false) {
+            return;
+        }
+        
+        foreach ($verses as $verse) {
+            $jsonLine = json_encode($verse, JSON_UNESCAPED_UNICODE) . "\n";
+            fwrite($file, $jsonLine);
+        }
+        
+        fclose($file);
+    }
+
+    /**
+     * Парсит XML файл Библии и извлекает все стихи
+     * 
+     * @param string $xmlPath Путь к XML файлу
+     * @return array Массив стихов [['book' => string, 'chapter' => int, 'verse' => int, 'text' => string], ...]
+     */
+    private function parseBibleXml(string $xmlPath): array
+    {
+        $verses = [];
+        
+        try {
+            // Загружаем XML файл
+            $xml = simplexml_load_file($xmlPath);
+            
+            if ($xml === false) {
+                return [];
+            }
+            
+            // Проходим по всем книгам
+            foreach ($xml->BIBLEBOOK as $book) {
+                $bookName = (string)$book['bname'];
+                
+                // Проходим по всем главам
+                foreach ($book->CHAPTER as $chapter) {
+                    $chapterNumber = (int)$chapter['cnumber'];
+                    
+                    // Проходим по всем стихам
+                    foreach ($chapter->VERS as $verse) {
+                        $verseNumber = (int)$verse['vnumber'];
+                        $verseText = trim((string)$verse);
+                        
+                        // Пропускаем пустые стихи
+                        if (empty($verseText)) {
+                            continue;
+                        }
+                        
+                        $verses[] = [
+                            'book' => $bookName,
+                            'chapter' => $chapterNumber,
+                            'verse' => $verseNumber,
+                            'text' => $verseText
+                        ];
+                    }
+                }
+            }
+            
+        } catch (\Throwable $e) {
+            // В случае ошибки возвращаем пустой массив
+            return [];
+        }
+        
+        return $verses;
     }
 }

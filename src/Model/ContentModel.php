@@ -56,14 +56,13 @@ class ContentModel
 
     /**
      * Получает случайную цитату из Библии из XML файла:
-     * Выбирает несколько стихов, начиная со стиха с заглавной буквы (начало предложения)
+     * Выбирает цитату целиком, начиная со стиха с заглавной буквы (начало предложения)
+     * до выбранного стиха включительно
      * Использует индекс по главам для оптимизации загрузки
      * 
-     * @param int $minVerses Минимальное количество стихов в цитате (по умолчанию 3)
-     * @param int $maxVerses Максимальное количество стихов в цитате (по умолчанию 7)
      * @return array ['name' => null, 'text' => string] - цитата из Библии
      */
-    public function getRandomQuote(int $minVerses = 3, int $maxVerses = 7): array
+    public function getRandomQuote(): array
     {
         $xmlPath = __DIR__ . '/../../storage/rus-synodal.zefania.xml';
         $jsonlPath = __DIR__ . '/../../storage/bible_verses.jsonl';
@@ -140,7 +139,7 @@ class ContentModel
         $firstChar = mb_substr($currentVerseText, 0, 1);
         $startIndex = $verseIndexInChapter;
         
-        // Если первая буква строчная - идём вверх до заглавной
+        // Если первая буква строчная - идём вверх до заглавной (начало предложения)
         if ($this->isLowerCase($firstChar)) {
             // Идём вверх по стихам, пока не найдём стих с заглавной буквы
             for ($i = $verseIndexInChapter - 1; $i >= 0; $i--) {
@@ -150,7 +149,7 @@ class ContentModel
                 }
                 
                 $char = mb_substr($verseText, 0, 1);
-                // Если первая буква заглавная - нашли начало
+                // Если первая буква заглавная - нашли начало предложения
                 if ($this->isUpperCase($char)) {
                     $startIndex = $i;
                     break;
@@ -158,13 +157,10 @@ class ContentModel
             }
         }
         
-        // Определяем количество стихов для цитаты
-        $versesCount = rand($minVerses, $maxVerses);
+        // Конец цитаты - это выбранный стих (не добавляем дополнительные стихи)
+        $endIndex = $verseIndexInChapter;
         
-        // Ограничиваем концом главы
-        $endIndex = min($startIndex + $versesCount - 1, count($chapterVerses) - 1);
-        
-        // Собираем цитату из выбранных стихов
+        // Собираем цитату от начала предложения до выбранного стиха включительно
         $quoteVerses = [];
         for ($i = $startIndex; $i <= $endIndex; $i++) {
             $quoteVerses[] = $chapterVerses[$i];
@@ -180,8 +176,8 @@ class ContentModel
             ];
         }
         
-        // Объединяем текст стихов через пробел
-        $text = implode(' ', array_column($quoteVerses, 'text'));
+        // Объединяем текст стихов через двойной перенос строки для лучшей читаемости
+        $text = implode("\n\n", array_column($quoteVerses, 'text'));
         
         // Формируем ссылку (например: "От Матфея 5:3-7")
         $startVerse = $quoteVerses[0]['verse'];

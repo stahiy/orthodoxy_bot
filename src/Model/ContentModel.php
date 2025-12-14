@@ -157,8 +157,48 @@ class ContentModel
             }
         }
         
-        // Конец цитаты - это выбранный стих (не добавляем дополнительные стихи)
+        // Ищем конец предложения: идём вниз от выбранного стиха
+        // Предложение заканчивается на точку, восклицательный или вопросительный знак
+        // или когда начинается следующий стих с заглавной буквы
         $endIndex = $verseIndexInChapter;
+        $chapterVersesCount = count($chapterVerses);
+        
+        for ($i = $verseIndexInChapter; $i < $chapterVersesCount; $i++) {
+            $verseText = trim($chapterVerses[$i]['text']);
+            if (empty($verseText)) {
+                continue;
+            }
+            
+            // Проверяем, заканчивается ли стих на знак окончания предложения
+            // Точка, восклицательный или вопросительный знак - это конец предложения
+            // Точка с запятой (;) НЕ является концом предложения
+            $lastChar = mb_substr($verseText, -1);
+            if (in_array($lastChar, ['。', '.', '!', '?'], true)) {
+                $endIndex = $i;
+                break;
+            }
+            
+            // Если следующий стих начинается с заглавной буквы - это конец предложения
+            if ($i + 1 < $chapterVersesCount) {
+                $nextVerseText = trim($chapterVerses[$i + 1]['text']);
+                if (!empty($nextVerseText)) {
+                    $nextFirstChar = mb_substr($nextVerseText, 0, 1);
+                    // Проверяем, что это действительно начало нового предложения
+                    // (заглавная буква, а не просто цифра или другой символ)
+                    if ($this->isUpperCase($nextFirstChar)) {
+                        $endIndex = $i;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Если не нашли конец предложения - берем до конца главы или до выбранного стиха + несколько стихов
+        // Это fallback на случай, если предложение очень длинное
+        if ($endIndex === $verseIndexInChapter) {
+            // Берем выбранный стих и еще несколько стихов после него (максимум 5 стихов)
+            $endIndex = min($verseIndexInChapter + 4, $chapterVersesCount - 1);
+        }
         
         // Собираем цитату от начала предложения до выбранного стиха включительно
         $quoteVerses = [];

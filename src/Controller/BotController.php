@@ -7,14 +7,27 @@ use App\Model\CalendarModel;
 use App\Model\ContentModel;
 use App\Model\SubscriberModel;
 use App\View\BotView;
+use App\Lib\DeepSeekService;
 
 class BotController
 {
+    private ?DeepSeekService $deepSeekService = null;
+
     public function __construct(
         private CalendarModel $calendar,
         private ContentModel $content,
-        private SubscriberModel $subscribers
-    ) {}
+        private SubscriberModel $subscribers,
+        ?string $deepSeekApiKey = null,
+        ?string $deepSeekSystemPrompt = null
+    ) {
+        // Инициализируем DeepSeek сервис, если передан API ключ
+        if ($deepSeekApiKey !== null && $deepSeekApiKey !== '') {
+            $this->deepSeekService = new DeepSeekService(
+                $deepSeekApiKey,
+                $deepSeekSystemPrompt ?? ''
+            );
+        }
+    }
 
     public function start(Nutgram $bot): void
     {
@@ -114,6 +127,58 @@ class BotController
             $bot->sendMessage("❌ Вы отписались от ежедневных уведомлений.");
         } else {
             $bot->sendMessage("ℹ️ Вы не были подписаны на уведомления.");
+        }
+    }
+
+    /**
+     * Команда для отправки сообщения в DeepSeek
+     * Использование: /ask Ваш вопрос
+     */
+    public function ask(Nutgram $bot): void
+    {
+        // Проверяем наличие API ключа
+        if ($this->deepSeekService === null) {
+            $bot->sendMessage("❌ Сервис DeepSeek не настроен. Обратитесь к администратору.");
+            return;
+        }
+
+        // Отправляем действие "печатает"
+        $bot->sendChatAction('typing');
+
+        // Получаем текст сообщения
+        $message = $bot->message();
+        $text = $message?->text ?? '';
+
+        // Убираем команду /ask из начала текста
+        $question = null;
+        if (preg_match('/^\/ask\s+(.+)$/is', $text, $matches)) {
+            $question = trim($matches[1]);
+        }
+
+        // Если вопрос не указан, отправляем подсказку
+        if (empty($question)) {
+            $bot->sendMessage(
+                "❓ Пожалуйста, укажите ваш вопрос после команды /ask\n\n" .
+                "Пример: /ask Что такое православие?"
+            );
+            return;
+        }
+
+        try {
+            // Отправляем запрос в DeepSeek
+            $answer = $this->deepSeekService->ask($question);
+
+            // Отправляем ответ пользователю
+            $bot->sendMessage($answer);
+        } catch (\Exception $e) {
+            // Логируем ошибку и отправляем сообщение пользователю
+            error_log("DeepSeek error: " . $e->getMessage());
+            
+            $bot->sendMessage(
+                "❌ Произошла ошибка при обращении к DeepSeek:\n" .
+                $e->getMessage() . "\n\n" .
+                "Попробуйте позже или обратитесь к администратору."
+            );
         }
     }
 }

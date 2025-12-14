@@ -23,7 +23,13 @@ $subscribers = new SubscriberModel($config['paths']);
 $content = new ContentModel($prayers, $quotes);
 
 // Инициализация Контроллера
-$controller = new BotController($calendar, $content, $subscribers);
+$controller = new BotController(
+    $calendar, 
+    $content, 
+    $subscribers,
+    $config['deepseek']['api_key'] ?? null,
+    $config['deepseek']['system_prompt'] ?? null
+);
 
 // Инициализация Бота
 $bot = new Nutgram(
@@ -41,6 +47,7 @@ $bot->onCommand('quote', [$controller, 'quote']);
 $bot->onCommand('saint', [$controller, 'saint']);
 $bot->onCommand('subscribe', [$controller, 'subscribe']);
 $bot->onCommand('unsubscribe', [$controller, 'unsubscribe']);
+$bot->onCommand('ask', [$controller, 'ask']);
 
 // Запуск
 $bot->run();

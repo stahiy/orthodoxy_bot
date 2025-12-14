@@ -37,7 +37,13 @@ $subscribers = new SubscriberModel($config['paths']);
 $content = new ContentModel($prayers, $quotes);
 
 // 3. Инициализация контроллера — ДО бота!
-$controller = new BotController($calendar, $content, $subscribers);
+$controller = new BotController(
+    $calendar, 
+    $content, 
+    $subscribers,
+    $config['deepseek']['api_key'] ?? null,
+    $config['deepseek']['system_prompt'] ?? null
+);
 
 // 4. Создаём бота
 $bot = new Nutgram($config['bot']['token']);
@@ -53,6 +59,7 @@ $bot->onCommand('quote', [$controller, 'quote']);
 $bot->onCommand('saint', [$controller, 'saint']);
 $bot->onCommand('subscribe', [$controller, 'subscribe']);
 $bot->onCommand('unsubscribe', [$controller, 'unsubscribe']);
+$bot->onCommand('ask', [$controller, 'ask']);
 
 // 7. Запуск обработки webhook-запроса
 $bot->run();

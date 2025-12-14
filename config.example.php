@@ -9,6 +9,10 @@ return [
             'connect_timeout' => 10,
         ],
     ],
+    'deepseek' => [
+        'api_key' => 'YOUR_DEEPSEEK_API_KEY_HERE', // Получите на https://platform.deepseek.com
+        'system_prompt' => 'Ты православный помощник, который помогает людям понять православную веру, традиции и учение. Отвечай на вопросы с уважением, используя православную терминологию и ссылаясь на Священное Писание и святых отцов Церкви, когда это уместно.',
+    ],
     'paths' => [
         'storage' => __DIR__ . '/storage',
         'subscribers_file' => 'subscribers.json',

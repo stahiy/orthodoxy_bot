@@ -171,14 +171,26 @@ class BotController
             // Отправляем ответ пользователю
             $bot->sendMessage($answer);
         } catch (\Exception $e) {
-            // Логируем ошибку и отправляем сообщение пользователю
+            // Логируем ошибку
             error_log("DeepSeek error: " . $e->getMessage());
             
-            $bot->sendMessage(
-                "❌ Произошла ошибка при обращении к DeepSeek:\n" .
-                $e->getMessage() . "\n\n" .
-                "Попробуйте позже или обратитесь к администратору."
-            );
+            // Формируем понятное сообщение для пользователя
+            $errorMessage = $e->getMessage();
+            
+            // Если это ошибка баланса, показываем специальное сообщение
+            if (strpos($errorMessage, '402') !== false || strpos($errorMessage, 'Insufficient Balance') !== false) {
+                $bot->sendMessage(
+                    "❌ Недостаточно средств на балансе DeepSeek API.\n\n" .
+                    "Пожалуйста, пополните баланс на https://platform.deepseek.com\n\n" .
+                    "Обратитесь к администратору для решения проблемы."
+                );
+            } else {
+                $bot->sendMessage(
+                    "❌ Произошла ошибка при обращении к DeepSeek:\n" .
+                    $errorMessage . "\n\n" .
+                    "Попробуйте позже или обратитесь к администратору."
+                );
+            }
         }
     }
 }

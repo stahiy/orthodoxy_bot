@@ -56,16 +56,19 @@ class ContentModel
 
     /**
      * Получает случайную цитату из Библии из XML файла:
-     * 1. Использует индексный файл для быстрого доступа
-     * 2. Читает только нужный стих из JSON Lines файла (не загружает весь файл)
+     * Выбирает несколько стихов, начиная со стиха с заглавной буквы (начало предложения)
+     * Использует индекс по главам для оптимизации загрузки
      * 
+     * @param int $minVerses Минимальное количество стихов в цитате (по умолчанию 3)
+     * @param int $maxVerses Максимальное количество стихов в цитате (по умолчанию 7)
      * @return array ['name' => null, 'text' => string] - цитата из Библии
      */
-    public function getRandomQuote(): array
+    public function getRandomQuote(int $minVerses = 3, int $maxVerses = 7): array
     {
         $xmlPath = __DIR__ . '/../../storage/rus-synodal.zefania.xml';
         $jsonlPath = __DIR__ . '/../../storage/bible_verses.jsonl';
         $indexPath = __DIR__ . '/../../storage/bible_index.json';
+        $chaptersIndexPath = __DIR__ . '/../../storage/bible_chapters_index.json';
         
         // Проверяем существование XML файла
         if (!file_exists($xmlPath)) {
@@ -76,9 +79,9 @@ class ContentModel
         }
         
         // Инициализируем кэш (если нужно)
-        $this->ensureBibleCache($xmlPath, $jsonlPath, $indexPath);
+        $this->ensureBibleCache($xmlPath, $jsonlPath, $indexPath, $chaptersIndexPath);
         
-        // Загружаем индекс (легкий файл, ~1 КБ)
+        // Загружаем индекс
         $index = $this->loadIndex($indexPath);
         if (empty($index) || empty($index['count']) || $index['count'] <= 0) {
             return [
@@ -90,19 +93,105 @@ class ContentModel
         // Выбираем случайный номер стиха (от 0 до count-1)
         $randomVerseNumber = rand(0, $index['count'] - 1);
         
-        // Загружаем только нужный стих из JSON Lines (читаем только одну строку)
-        $verse = $this->loadVerseByIndex($jsonlPath, $randomVerseNumber);
+        // Загружаем случайный стих
+        $randomVerse = $this->loadVerseByIndex($jsonlPath, $randomVerseNumber);
         
-        if (empty($verse)) {
+        if (empty($randomVerse)) {
             return [
                 'name' => null,
                 'text' => "Не удалось загрузить стих."
             ];
         }
         
-        // Формируем текст цитаты
-        $text = $verse['text'];
-        $reference = "{$verse['book']} {$verse['chapter']}:{$verse['verse']}";
+        // Загружаем стихи той же главы используя индекс по главам
+        $chapterVerses = $this->loadChapterVersesByIndex(
+            $jsonlPath,
+            $chaptersIndexPath,
+            $randomVerse['book'],
+            $randomVerse['chapter']
+        );
+        
+        if (empty($chapterVerses)) {
+            // Fallback: возвращаем один стих
+            $text = $randomVerse['text'];
+            $reference = "{$randomVerse['book']} {$randomVerse['chapter']}:{$randomVerse['verse']}";
+            return [
+                'name' => null,
+                'text' => $text . "\n\n(" . $reference . ")"
+            ];
+        }
+        
+        // Находим индекс случайного стиха в массиве стихов главы
+        $verseIndexInChapter = -1;
+        foreach ($chapterVerses as $idx => $verse) {
+            if ($verse['verse'] === $randomVerse['verse']) {
+                $verseIndexInChapter = $idx;
+                break;
+            }
+        }
+        
+        if ($verseIndexInChapter === -1) {
+            // Если не нашли - используем первый стих
+            $verseIndexInChapter = 0;
+        }
+        
+        // Проверяем первую букву случайного стиха
+        $currentVerseText = trim($chapterVerses[$verseIndexInChapter]['text']);
+        $firstChar = mb_substr($currentVerseText, 0, 1);
+        $startIndex = $verseIndexInChapter;
+        
+        // Если первая буква строчная - идём вверх до заглавной
+        if ($this->isLowerCase($firstChar)) {
+            // Идём вверх по стихам, пока не найдём стих с заглавной буквы
+            for ($i = $verseIndexInChapter - 1; $i >= 0; $i--) {
+                $verseText = trim($chapterVerses[$i]['text']);
+                if (empty($verseText)) {
+                    continue;
+                }
+                
+                $char = mb_substr($verseText, 0, 1);
+                // Если первая буква заглавная - нашли начало
+                if ($this->isUpperCase($char)) {
+                    $startIndex = $i;
+                    break;
+                }
+            }
+        }
+        
+        // Определяем количество стихов для цитаты
+        $versesCount = rand($minVerses, $maxVerses);
+        
+        // Ограничиваем концом главы
+        $endIndex = min($startIndex + $versesCount - 1, count($chapterVerses) - 1);
+        
+        // Собираем цитату из выбранных стихов
+        $quoteVerses = [];
+        for ($i = $startIndex; $i <= $endIndex; $i++) {
+            $quoteVerses[] = $chapterVerses[$i];
+        }
+        
+        if (empty($quoteVerses)) {
+            // Если не удалось собрать цитату - возвращаем хотя бы один стих
+            $text = $randomVerse['text'];
+            $reference = "{$randomVerse['book']} {$randomVerse['chapter']}:{$randomVerse['verse']}";
+            return [
+                'name' => null,
+                'text' => $text . "\n\n(" . $reference . ")"
+            ];
+        }
+        
+        // Объединяем текст стихов через пробел
+        $text = implode(' ', array_column($quoteVerses, 'text'));
+        
+        // Формируем ссылку (например: "От Матфея 5:3-7")
+        $startVerse = $quoteVerses[0]['verse'];
+        $endVerse = $quoteVerses[count($quoteVerses) - 1]['verse'];
+        
+        if ($startVerse === $endVerse) {
+            $reference = "{$quoteVerses[0]['book']} {$quoteVerses[0]['chapter']}:{$startVerse}";
+        } else {
+            $reference = "{$quoteVerses[0]['book']} {$quoteVerses[0]['chapter']}:{$startVerse}-{$endVerse}";
+        }
         
         return [
             'name' => null,
@@ -196,16 +285,17 @@ class ContentModel
     }
 
     /**
-     * Инициализирует кэш: парсит XML и создает JSON Lines + индекс
+     * Инициализирует кэш: парсит XML и создает JSON Lines + индексы
      * 
      * @param string $xmlPath Путь к XML файлу
      * @param string $jsonlPath Путь к JSON Lines файлу
      * @param string $indexPath Путь к индексному файлу
+     * @param string $chaptersIndexPath Путь к индексному файлу по главам
      */
-    private function ensureBibleCache(string $xmlPath, string $jsonlPath, string $indexPath): void
+    private function ensureBibleCache(string $xmlPath, string $jsonlPath, string $indexPath, string $chaptersIndexPath): void
     {
         // Если кэш существует и свежий - ничего не делаем
-        if (file_exists($jsonlPath) && file_exists($indexPath)) {
+        if (file_exists($jsonlPath) && file_exists($indexPath) && file_exists($chaptersIndexPath)) {
             $jsonlMtime = filemtime($jsonlPath);
             $xmlMtime = filemtime($xmlPath);
             
@@ -225,6 +315,9 @@ class ContentModel
         // Сохраняем в JSON Lines формат (каждая строка = один JSON объект)
         $this->saveVersesAsJsonLines($verses, $jsonlPath);
         
+        // Создаем индекс по главам (диапазоны строк для каждой главы)
+        $chaptersIndex = $this->buildChaptersIndex($verses);
+        
         // Сохраняем индекс (только метаданные)
         $index = [
             'count' => count($verses),
@@ -235,6 +328,12 @@ class ContentModel
         file_put_contents(
             $indexPath,
             json_encode($index, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        );
+        
+        // Сохраняем индекс по главам
+        file_put_contents(
+            $chaptersIndexPath,
+            json_encode(['chapters' => $chaptersIndex], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
         );
     }
 
@@ -374,5 +473,185 @@ class ContentModel
         }
         
         return $verses;
+    }
+
+    /**
+     * Проверяет, является ли символ строчной буквой
+     * 
+     * @param string $char Символ для проверки
+     * @return bool true если строчная буква
+     */
+    private function isLowerCase(string $char): bool
+    {
+        // Проверяем, что это буква и она в нижнем регистре
+        return mb_strlen($char) === 1 
+            && mb_strtolower($char) === $char 
+            && $char !== mb_strtoupper($char)
+            && preg_match('/\p{L}/u', $char);
+    }
+
+    /**
+     * Проверяет, является ли символ заглавной буквой
+     * 
+     * @param string $char Символ для проверки
+     * @return bool true если заглавная буква
+     */
+    private function isUpperCase(string $char): bool
+    {
+        // Проверяем, что это буква и она в верхнем регистре
+        return mb_strlen($char) === 1 
+            && mb_strtoupper($char) === $char 
+            && $char !== mb_strtolower($char)
+            && preg_match('/\p{L}/u', $char);
+    }
+
+    /**
+     * Загружает все стихи указанной главы из JSON Lines файла используя индекс по главам
+     * 
+     * @param string $jsonlPath Путь к JSON Lines файлу
+     * @param string $chaptersIndexPath Путь к индексному файлу по главам
+     * @param string $bookName Название книги
+     * @param int $chapterNumber Номер главы
+     * @return array Массив стихов главы [['book' => string, 'chapter' => int, 'verse' => int, 'text' => string], ...]
+     */
+    private function loadChapterVersesByIndex(string $jsonlPath, string $chaptersIndexPath, string $bookName, int $chapterNumber): array
+    {
+        if (!file_exists($jsonlPath) || !file_exists($chaptersIndexPath)) {
+            return [];
+        }
+        
+        // Загружаем индекс по главам
+        $chaptersIndex = $this->loadChaptersIndex($chaptersIndexPath);
+        if (empty($chaptersIndex)) {
+            return [];
+        }
+        
+        // Получаем диапазон стихов для нужной главы
+        $chapterKey = (string)$chapterNumber;
+        if (!isset($chaptersIndex[$bookName][$chapterKey])) {
+            return [];
+        }
+        
+        $chapterRange = $chaptersIndex[$bookName][$chapterKey];
+        $startLine = $chapterRange['start'];
+        $endLine = $chapterRange['end'];
+        
+        // Загружаем только нужные строки из файла
+        $chapterVerses = [];
+        
+        try {
+            $file = new \SplFileObject($jsonlPath, 'r');
+            
+            // Переходим к началу главы
+            $file->seek($startLine);
+            
+            // Читаем стихи от startLine до endLine включительно
+            for ($i = $startLine; $i <= $endLine; $i++) {
+                if ($file->eof()) {
+                    break;
+                }
+                
+                $line = $file->current();
+                if ($line === false || $line === '') {
+                    $file->next();
+                    continue;
+                }
+                
+                $verse = json_decode(trim($line), true);
+                if (is_array($verse) && $verse['book'] === $bookName && $verse['chapter'] === $chapterNumber) {
+                    $chapterVerses[] = $verse;
+                }
+                
+                $file->next();
+            }
+            
+        } catch (\Throwable $e) {
+            return [];
+        }
+        
+        // Сортируем по номеру стиха на случай, если порядок нарушен
+        usort($chapterVerses, function ($a, $b) {
+            return $a['verse'] <=> $b['verse'];
+        });
+        
+        return $chapterVerses;
+    }
+
+    /**
+     * Загружает индекс по главам
+     * 
+     * @param string $chaptersIndexPath Путь к индексному файлу
+     * @return array Индекс вида ['book_name' => ['chapter_num' => ['start' => int, 'end' => int], ...], ...]
+     */
+    private function loadChaptersIndex(string $chaptersIndexPath): array
+    {
+        if (!file_exists($chaptersIndexPath)) {
+            return [];
+        }
+        
+        $content = file_get_contents($chaptersIndexPath);
+        $index = json_decode($content, true);
+        
+        // Проверяем наличие структуры chapters
+        if (!is_array($index) || !isset($index['chapters'])) {
+            return [];
+        }
+        
+        return $index['chapters'];
+    }
+
+    /**
+     * Создает индекс по главам: для каждой книги+главы хранит диапазон индексов стихов
+     * 
+     * @param array $verses Массив всех стихов
+     * @return array Индекс вида ['book_name' => ['chapter_num' => ['start' => int, 'end' => int], ...], ...]
+     */
+    private function buildChaptersIndex(array $verses): array
+    {
+        $chaptersIndex = [];
+        $currentBook = null;
+        $currentChapter = null;
+        $chapterStart = null;
+        
+        foreach ($verses as $index => $verse) {
+            $book = $verse['book'];
+            $chapter = (string)$verse['chapter'];
+            
+            // Если сменилась книга или глава - сохраняем предыдущую главу
+            if ($currentBook !== null && $currentChapter !== null) {
+                if ($currentBook !== $book || $currentChapter !== $chapter) {
+                    // Сохраняем диапазон предыдущей главы
+                    if (!isset($chaptersIndex[$currentBook])) {
+                        $chaptersIndex[$currentBook] = [];
+                    }
+                    $chaptersIndex[$currentBook][$currentChapter] = [
+                        'start' => $chapterStart,
+                        'end' => $index - 1
+                    ];
+                    
+                    // Начинаем новую главу
+                    $chapterStart = $index;
+                }
+            } else {
+                // Первая глава
+                $chapterStart = $index;
+            }
+            
+            $currentBook = $book;
+            $currentChapter = $chapter;
+        }
+        
+        // Сохраняем последнюю главу
+        if ($currentBook !== null && $currentChapter !== null) {
+            if (!isset($chaptersIndex[$currentBook])) {
+                $chaptersIndex[$currentBook] = [];
+            }
+            $chaptersIndex[$currentBook][$currentChapter] = [
+                'start' => $chapterStart,
+                'end' => count($verses) - 1
+            ];
+        }
+        
+        return $chaptersIndex;
     }
 }

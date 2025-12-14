@@ -14,12 +14,13 @@ class BotController
     private ?DeepSeekService $deepSeekService = null;
 
     public function __construct(
-        private CalendarModel $calendar,
-        private ContentModel $content,
+        private CalendarModel   $calendar,
+        private ContentModel    $content,
         private SubscriberModel $subscribers,
-        ?string $deepSeekApiKey = null,
-        ?string $deepSeekSystemPrompt = null
-    ) {
+        ?string                 $deepSeekApiKey = null,
+        ?string                 $deepSeekSystemPrompt = null
+    )
+    {
         // Инициализируем DeepSeek сервис, если передан API ключ
         if ($deepSeekApiKey !== null && $deepSeekApiKey !== '') {
             $this->deepSeekService = new DeepSeekService(
@@ -52,9 +53,9 @@ class BotController
         $view = new BotView($bot);
         // $prayer is ['title' => ..., 'text' => ...]
         if ($prayer['title'] === null) {
-             $bot->sendMessage($prayer['text']); // Fallback for empty
+            $bot->sendMessage($prayer['text']); // Fallback for empty
         } else {
-             $view->sendPrayer($prayer['title'], $prayer['text']);
+            $view->sendPrayer($prayer['title'], $prayer['text']);
         }
     }
 
@@ -173,10 +174,10 @@ class BotController
         } catch (\Exception $e) {
             // Логируем ошибку
             error_log("DeepSeek error: " . $e->getMessage());
-            
+
             // Формируем понятное сообщение для пользователя
             $errorMessage = $e->getMessage();
-            
+
             // Если это ошибка баланса, показываем специальное сообщение
             if (strpos($errorMessage, '402') !== false || strpos($errorMessage, 'Insufficient Balance') !== false) {
                 $bot->sendMessage(

@@ -173,7 +173,8 @@ class ContentModel
             // Точка, восклицательный или вопросительный знак - это конец предложения
             // Точка с запятой (;) НЕ является концом предложения
             $lastChar = mb_substr($verseText, -1);
-            if (in_array($lastChar, ['。', '.', '!', '?'], true)) {
+            $char = mb_substr($verseText, 0, 1);
+            if (in_array($lastChar, ['。', '.', '!', '?'], true) || $this->isUpperCase($char)) {
                 $endIndex = $i;
                 break;
             }

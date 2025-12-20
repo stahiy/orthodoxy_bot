@@ -162,6 +162,7 @@ class ContentModel
         // или когда начинается следующий стих с заглавной буквы
         $endIndex = $verseIndexInChapter;
         $chapterVersesCount = count($chapterVerses);
+        $foundEnd = false;
         
         for ($i = $verseIndexInChapter; $i < $chapterVersesCount; $i++) {
             $verseText = trim($chapterVerses[$i]['text']);
@@ -172,14 +173,17 @@ class ContentModel
             // Проверяем, заканчивается ли стих на знак окончания предложения
             // Точка, восклицательный или вопросительный знак - это конец предложения
             // Точка с запятой (;) НЕ является концом предложения
-            $lastChar = mb_substr($verseText, -1);
-            $char = mb_substr($verseText, 0, 1);
-            if (in_array($lastChar, ['。', '.', '!', '?'], true) || $this->isUpperCase($char)) {
+            // Учитываем возможные пробелы после знака препинания
+            $trimmedVerse = rtrim($verseText);
+            $lastChar = mb_substr($trimmedVerse, -1);
+            if (in_array($lastChar, ['。', '.', '!', '?'], true)) {
                 $endIndex = $i;
+                $foundEnd = true;
                 break;
             }
             
             // Если следующий стих начинается с заглавной буквы - это конец предложения
+            // Это означает, что текущий стих - последний в предложении
             if ($i + 1 < $chapterVersesCount) {
                 $nextVerseText = trim($chapterVerses[$i + 1]['text']);
                 if (!empty($nextVerseText)) {
@@ -187,18 +191,20 @@ class ContentModel
                     // Проверяем, что это действительно начало нового предложения
                     // (заглавная буква, а не просто цифра или другой символ)
                     if ($this->isUpperCase($nextFirstChar)) {
+                        // Если следующий стих начинается с заглавной буквы - это явный признак нового предложения
+                        // Останавливаемся на текущем стихе
                         $endIndex = $i;
+                        $foundEnd = true;
                         break;
                     }
                 }
             }
         }
         
-        // Если не нашли конец предложения - берем до конца главы или до выбранного стиха + несколько стихов
-        // Это fallback на случай, если предложение очень длинное
-        if ($endIndex === $verseIndexInChapter) {
-            // Берем выбранный стих и еще несколько стихов после него (максимум 5 стихов)
-            $endIndex = min($verseIndexInChapter + 4, $chapterVersesCount - 1);
+        // Если не нашли конец предложения - берем только выбранный стих
+        // Это более консервативный подход, чтобы не захватывать лишние предложения
+        if (!$foundEnd) {
+            $endIndex = $verseIndexInChapter;
         }
         
         // Собираем цитату от начала предложения до выбранного стиха включительно
@@ -217,8 +223,10 @@ class ContentModel
             ];
         }
         
-        // Объединяем текст стихов через двойной перенос строки для лучшей читаемости
-        $text = implode("\n\n", array_column($quoteVerses, 'text'));
+        // Объединяем текст стихов через пробел, так как это одно предложение
+        // (мы уже ограничили цитату одним предложением выше)
+        $versesTexts = array_filter(array_map('trim', array_column($quoteVerses, 'text')), fn($t) => !empty($t));
+        $text = implode(' ', $versesTexts);
         
         // Формируем ссылку (например: "От Матфея 5:3-7")
         $startVerse = $quoteVerses[0]['verse'];

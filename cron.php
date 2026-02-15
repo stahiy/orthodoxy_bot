@@ -90,7 +90,7 @@ if ($defaultMode) {
     $quoteMessage = "📖 <b>Ежедневная цитата из Библии</b>\n\n{$safeQuote}";
     if (!empty($quote['interpretation'])) {
         $safeInterpretation = BotView::escapeHtml($quote['interpretation']);
-        $quoteMessage .= "\n\n📜 <b>Толкование:</b>\n{$safeInterpretation}";
+        $quoteMessage .= "\n\n📜 <b>Толкование:</b>\n<tg-spoiler>{$safeInterpretation}</tg-spoiler>";
     }
 
     foreach ($ids as $chatId) {
@@ -111,7 +111,7 @@ if ($sendBible) {
     $quoteMessage = "📖 <b>Цитата из Библии</b>\n\n{$safeQuote}";
     if (!empty($quote['interpretation'])) {
         $safeInterpretation = BotView::escapeHtml($quote['interpretation']);
-        $quoteMessage .= "\n\n📜 <b>Толкование:</b>\n{$safeInterpretation}";
+        $quoteMessage .= "\n\n📜 <b>Толкование:</b>\n<tg-spoiler>{$safeInterpretation}</tg-spoiler>";
     }
 
     foreach ($ids as $chatId) {

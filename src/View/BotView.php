@@ -73,7 +73,7 @@ class BotView
 
         if (!empty($quote['interpretation'])) {
             $interpretation = self::escapeHtml($quote['interpretation']);
-            $text .= "\n\n📜 <b>Толкование:</b>\n{$interpretation}";
+            $text .= "\n\n📜 <b>Толкование:</b>\n<tg-spoiler>{$interpretation}</tg-spoiler>";
         }
 
         if (!empty($quote['name'])) {

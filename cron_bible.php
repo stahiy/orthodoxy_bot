@@ -53,7 +53,7 @@ $safeQuote = BotView::escapeHtml($quote['text']);
 $quoteMessage = "📖 <b>Ежедневная цитата из Библии</b>\n\n{$safeQuote}";
 if (!empty($quote['interpretation'])) {
     $safeInterpretation = BotView::escapeHtml($quote['interpretation']);
-    $quoteMessage .= "\n\n📜 <b>Толкование:</b>\n{$safeInterpretation}";
+    $quoteMessage .= "\n\n📜 <b>Толкование:</b>\n<tg-spoiler>{$safeInterpretation}</tg-spoiler>";
 }
 
 // Отправляем рассылку

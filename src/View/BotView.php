@@ -19,6 +19,21 @@ class BotView
         return htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 
+    /**
+     * Форматирует толкование для сворачиваемого блока (blockquote expandable).
+     * Текст разбивается на строки, чтобы Telegram корректно показывал «свёрнуто» вид.
+     */
+    public static function formatInterpretationBlock(string $interpretation): string
+    {
+        $safe = self::escapeHtml($interpretation);
+        $lines = preg_split('/(?<=[.!?])\s+/u', $safe, -1, PREG_SPLIT_NO_EMPTY);
+        $withNewlines = implode("\n", array_map('trim', array_filter($lines)));
+        if (strpos($withNewlines, "\n") === false && mb_strlen($withNewlines) > 60) {
+            $withNewlines = wordwrap($withNewlines, 60, "\n", true);
+        }
+        return "\n\n📜 <b>Толкование:</b>\n<blockquote expandable>{$withNewlines}</blockquote>";
+    }
+
     public function sendWelcome(): void
     {
         $this->bot->sendMessage(
@@ -72,8 +87,7 @@ class BotView
         $text = "{$header}\n\n{$body}";
 
         if (!empty($quote['interpretation'])) {
-            $interpretation = self::escapeHtml($quote['interpretation']);
-            $text .= "\n\n📜 <b>Толкование:</b>\n<tg-spoiler>{$interpretation}</tg-spoiler>";
+            $text .= self::formatInterpretationBlock($quote['interpretation']);
         }
 
         if (!empty($quote['name'])) {

@@ -117,6 +117,9 @@ class CalendarModel
         } elseif ($dateOld !== null) {
             $parts[] = $dateOld;
         }
+        if (!empty($day['feasts']) && is_array($day['feasts'])) {
+            $parts[] = '🗓 ' . implode("\n\n", $day['feasts']);
+        }
         if (!empty($day['fastInfo'])) {
             $parts[] = $day['fastInfo'];
         }
@@ -125,9 +128,6 @@ class CalendarModel
         }
         if (!empty($day['voice'])) {
             $parts[] = $day['voice'];
-        }
-        if (!empty($day['feasts']) && is_array($day['feasts'])) {
-            $parts[] = '🗓 ' . implode("\n\n", $day['feasts']);
         }
 
         if (empty($parts)) {

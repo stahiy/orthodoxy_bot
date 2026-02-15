@@ -39,7 +39,8 @@ $prayers = require $config['paths']['prayers_file'];
 $quotes = require $config['paths']['quotes_file'];
 
 // Модели
-$calendar = new CalendarModel($config['paths']['holidays_json_file']);
+$holidaysJsonPath = $config['paths']['holidays_json_file'] ?? __DIR__ . '/storage/holidays_next_week.json';
+$calendar = new CalendarModel($holidaysJsonPath);
 $subscribers = new SubscriberModel($config['paths']);
 $content = new ContentModel($prayers, $quotes);
 

@@ -25,7 +25,8 @@ require __DIR__ . '/vendor/autoload.php';
 $config = require __DIR__ . '/config.php';
 
 // Инициализация моделей
-$calendar = new CalendarModel($config['paths']['holidays_json_file']);
+$holidaysJsonPath = $config['paths']['holidays_json_file'] ?? __DIR__ . '/storage/holidays_next_week.json';
+$calendar = new CalendarModel($holidaysJsonPath);
 $subscribers = new SubscriberModel($config['paths']);
 
 // Инициализация бота

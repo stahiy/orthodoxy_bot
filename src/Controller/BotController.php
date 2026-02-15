@@ -5,6 +5,7 @@ namespace App\Controller;
 use SergiX44\Nutgram\Nutgram;
 use App\Model\CalendarModel;
 use App\Model\ContentModel;
+use App\Model\NewTestamentQuoteModel;
 use App\Model\SubscriberModel;
 use App\View\BotView;
 use App\Lib\DeepSeekService;
@@ -14,9 +15,10 @@ class BotController
     private ?DeepSeekService $deepSeekService = null;
 
     public function __construct(
-        private CalendarModel   $calendar,
-        private ContentModel    $content,
-        private SubscriberModel $subscribers,
+        private CalendarModel          $calendar,
+        private ContentModel           $content,
+        private NewTestamentQuoteModel $bibleQuote,
+        private SubscriberModel        $subscribers,
         ?string                 $deepSeekApiKey = null,
         ?string                 $deepSeekSystemPrompt = null
     )
@@ -64,7 +66,7 @@ class BotController
         // Отправляем действие "печатает", пока грузится цитата
         $bot->sendChatAction('typing');
 
-        $quote = $this->content->getRandomQuote();
+        $quote = $this->bibleQuote->getRandomQuote();
         $view = new BotView($bot);
         $view->sendQuote($quote, 'bible');
     }

@@ -18,6 +18,7 @@ use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\RunningMode\Webhook;
 use App\Model\CalendarModel;
 use App\Model\ContentModel;
+use App\Model\NewTestamentQuoteModel;
 use App\Model\SubscriberModel;
 use App\Controller\BotController;
 
@@ -35,11 +36,13 @@ $holidaysJsonPath = $config['paths']['holidays_json_file'] ?? __DIR__ . '/storag
 $calendar = new CalendarModel($holidaysJsonPath);
 $subscribers = new SubscriberModel($config['paths']);
 $content = new ContentModel($prayers, $quotes);
+$bibleQuote = new NewTestamentQuoteModel();
 
 // 3. Инициализация контроллера — ДО бота!
 $controller = new BotController(
-    $calendar, 
-    $content, 
+    $calendar,
+    $content,
+    $bibleQuote,
     $subscribers,
     $config['deepseek']['api_key'] ?? null,
     $config['deepseek']['system_prompt'] ?? null

@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Configuration;
-use App\Model\ContentModel;
+use App\Model\NewTestamentQuoteModel;
 use App\Model\SubscriberModel;
 use App\View\BotView;
 use App\Lib\NewsletterService;
@@ -24,12 +24,8 @@ require __DIR__ . '/vendor/autoload.php';
 // Загружаем конфиг
 $config = require __DIR__ . '/config.php';
 
-// Загружаем данные
-$prayers = require $config['paths']['prayers_file'];
-$quotes = require $config['paths']['quotes_file'];
-
-// Инициализация моделей
-$content = new ContentModel($prayers, $quotes);
+// Инициализация модели цитат из Библии
+$bibleQuote = new NewTestamentQuoteModel();
 $subscribers = new SubscriberModel($config['paths']);
 
 // Инициализация бота
@@ -44,8 +40,8 @@ $view = new BotView($bot);
 // Инициализация сервиса рассылки
 $newsletter = new NewsletterService($subscribers, $view);
 
-// Получаем случайную цитату из Библии
-$quote = $content->getRandomQuote();
+// Получаем случайную цитату из Библии (из new_testament_quotes.json с толкованием)
+$quote = $bibleQuote->getRandomQuote();
 
 // Проверяем, что цитата получена
 if (empty($quote['text'])) {
@@ -53,9 +49,12 @@ if (empty($quote['text'])) {
     exit(1);
 }
 
-$quoteText = $quote['text'];
-$safeQuote = BotView::escapeHtml($quoteText);
+$safeQuote = BotView::escapeHtml($quote['text']);
 $quoteMessage = "📖 <b>Ежедневная цитата из Библии</b>\n\n{$safeQuote}";
+if (!empty($quote['interpretation'])) {
+    $safeInterpretation = BotView::escapeHtml($quote['interpretation']);
+    $quoteMessage .= "\n\n📜 <b>Толкование:</b>\n{$safeInterpretation}";
+}
 
 // Отправляем рассылку
 $stats = $newsletter->sendToAll($quoteMessage, 'цитата из Библии');

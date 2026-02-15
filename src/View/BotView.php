@@ -59,7 +59,8 @@ class BotView
     /**
      * Отправка цитаты (из Библии или от святого) с заголовком.
      *
-     * @param array $quote Массив с ключами 'name' (автор, опционально) и 'text' (текст цитаты)
+     * @param array $quote Массив с ключами 'name' (автор, опционально), 'text' (текст цитаты),
+     *                     'interpretation' (толкование, опционально — для цитат из Библии)
      * @param string $type 'bible' — заголовок «Ежедневная цитата из Библии», 'saint' — «Цитата святого»
      */
     public function sendQuote(array $quote, string $type = 'bible'): void
@@ -69,6 +70,11 @@ class BotView
             : "📖 <b>Ежедневная цитата из Библии</b>";
         $body = self::escapeHtml($quote['text']);
         $text = "{$header}\n\n{$body}";
+
+        if (!empty($quote['interpretation'])) {
+            $interpretation = self::escapeHtml($quote['interpretation']);
+            $text .= "\n\n📜 <b>Толкование:</b>\n{$interpretation}";
+        }
 
         if (!empty($quote['name'])) {
             $name = self::escapeHtml($quote['name']);

@@ -17,6 +17,7 @@ use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Configuration;
 use App\Model\CalendarModel;
 use App\Model\ContentModel;
+use App\Model\NewTestamentQuoteModel;
 use App\Model\SubscriberModel;
 use App\View\BotView;
 
@@ -43,6 +44,7 @@ $holidaysJsonPath = $config['paths']['holidays_json_file'] ?? __DIR__ . '/storag
 $calendar = new CalendarModel($holidaysJsonPath);
 $subscribers = new SubscriberModel($config['paths']);
 $content = new ContentModel($prayers, $quotes);
+$bibleQuote = new NewTestamentQuoteModel();
 
 // Инициализация бота
 $bot = new Nutgram(
@@ -82,11 +84,14 @@ if ($defaultMode) {
         echo "Праздников сегодня нет.\n";
     }
 
-    // 2. Отправка цитаты из Библии
-    $quote = $content->getRandomQuote();
-    $quoteText = $quote['text'];
-    $safeQuote = BotView::escapeHtml($quoteText);
+    // 2. Отправка цитаты из Библии (из new_testament_quotes.json с толкованием)
+    $quote = $bibleQuote->getRandomQuote();
+    $safeQuote = BotView::escapeHtml($quote['text']);
     $quoteMessage = "📖 <b>Ежедневная цитата из Библии</b>\n\n{$safeQuote}";
+    if (!empty($quote['interpretation'])) {
+        $safeInterpretation = BotView::escapeHtml($quote['interpretation']);
+        $quoteMessage .= "\n\n📜 <b>Толкование:</b>\n{$safeInterpretation}";
+    }
 
     foreach ($ids as $chatId) {
         try {
@@ -101,10 +106,13 @@ if ($defaultMode) {
 
 // Отправка цитаты из Библии (если указан флаг --bible или -b)
 if ($sendBible) {
-    $quote = $content->getRandomQuote();
-    $quoteText = $quote['text'];
-    $safeQuote = BotView::escapeHtml($quoteText);
+    $quote = $bibleQuote->getRandomQuote();
+    $safeQuote = BotView::escapeHtml($quote['text']);
     $quoteMessage = "📖 <b>Цитата из Библии</b>\n\n{$safeQuote}";
+    if (!empty($quote['interpretation'])) {
+        $safeInterpretation = BotView::escapeHtml($quote['interpretation']);
+        $quoteMessage .= "\n\n📜 <b>Толкование:</b>\n{$safeInterpretation}";
+    }
 
     foreach ($ids as $chatId) {
         try {

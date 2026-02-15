@@ -10,6 +10,15 @@ class BotView
         private Nutgram $bot
     ) {}
 
+    /**
+     * Экранирование текста для Telegram HTML (parse_mode: HTML).
+     * Экранируются только < > &
+     */
+    public static function escapeHtml(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
     public function sendWelcome(): void
     {
         $this->bot->sendMessage(
@@ -27,7 +36,8 @@ class BotView
     public function sendHoliday(?string $holiday): void
     {
         if ($holiday) {
-            $this->bot->sendMessage(text: "📅 Сегодня: *" . $holiday . "*", parse_mode: 'Markdown');
+            $safe = self::escapeHtml($holiday);
+            $this->bot->sendMessage(text: "📅 Сегодня: <b>{$safe}</b>", parse_mode: 'HTML');
         } else {
             $this->bot->sendMessage(text: "Сегодня нет великих двунадесятых праздников.");
         }
@@ -35,32 +45,43 @@ class BotView
 
     public function sendPrayer(string $title, string $text): void
     {
-        $this->bot->sendMessage(text: "🙏 *{$title}*\n\n{$text}", parse_mode: 'Markdown');
+        $safeTitle = self::escapeHtml($title);
+        $safeText = self::escapeHtml($text);
+        $this->bot->sendMessage(text: "🙏 <b>{$safeTitle}</b>\n\n{$safeText}", parse_mode: 'HTML');
     }
 
     /**
-     * Отправка цитаты (из Библии или от святого)
-     * 
+     * Отправка цитаты (из Библии или от святого) с заголовком.
+     *
      * @param array $quote Массив с ключами 'name' (автор, опционально) и 'text' (текст цитаты)
+     * @param string $type 'bible' — заголовок «Ежедневная цитата из Библии», 'saint' — «Цитата святого»
      */
-    public function sendQuote(array $quote): void
+    public function sendQuote(array $quote, string $type = 'bible'): void
     {
-        $text = "📖 {$quote['text']}";
-        
-        // Если есть автор (для цитат святых), добавляем его в конец
+        $header = $type === 'saint'
+            ? "📿 <b>Цитата святого</b>"
+            : "📖 <b>Ежедневная цитата из Библии</b>";
+        $body = self::escapeHtml($quote['text']);
+        $text = "{$header}\n\n{$body}";
+
         if (!empty($quote['name'])) {
-            $text .= "\n\n— *{$quote['name']}*";
+            $name = self::escapeHtml($quote['name']);
+            $text .= "\n\n— <b>{$name}</b>";
         }
-        
-        $this->bot->sendMessage(text: $text, parse_mode: 'Markdown');
+
+        $this->bot->sendMessage(text: $text, parse_mode: 'HTML');
     }
 
-    public function sendMessage(string $text, int $chatId): void
+    /**
+     * Отправка сообщения подписчику (рассылка).
+     * По умолчанию HTML, чтобы заголовки и разметка не ломались из-за * _ в тексте.
+     */
+    public function sendMessage(string $text, int $chatId, string $parseMode = 'HTML'): void
     {
         $this->bot->sendMessage(
             text: $text,
             chat_id: $chatId,
-            parse_mode: 'Markdown'
+            parse_mode: $parseMode
         );
     }
 }

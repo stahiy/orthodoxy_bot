@@ -66,7 +66,7 @@ class BotController
 
         $quote = $this->content->getRandomQuote();
         $view = new BotView($bot);
-        $view->sendQuote($quote);
+        $view->sendQuote($quote, 'bible');
     }
 
     /**
@@ -105,7 +105,7 @@ class BotController
 
             $bot->sendMessage($messageText);
         } else {
-            $view->sendQuote($quote);
+            $view->sendQuote($quote, 'saint');
         }
     }
 

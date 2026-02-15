@@ -55,11 +55,13 @@ if (empty($quote['text'])) {
 
 $quoteText = $quote['text'];
 $quoteAuthor = $quote['name'] ?? null;
+$safeQuote = BotView::escapeHtml($quoteText);
 
-// Формируем сообщение
-$quoteMessage = "📿 *Цитата святого*\n\n{$quoteText}";
+// Формируем сообщение с заголовком в HTML (чтобы * _ в цитатах не ломали разметку)
+$quoteMessage = "📿 <b>Цитата святого</b>\n\n{$safeQuote}";
 if ($quoteAuthor) {
-    $quoteMessage .= "\n\n— *{$quoteAuthor}*";
+    $safeAuthor = BotView::escapeHtml($quoteAuthor);
+    $quoteMessage .= "\n\n— <b>{$safeAuthor}</b>";
 }
 
 // Отправляем рассылку

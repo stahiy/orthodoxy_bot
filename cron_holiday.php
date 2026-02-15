@@ -45,7 +45,8 @@ $newsletter = new NewsletterService($subscribers, $view);
 $holiday = $calendar->getHoliday();
 
 if ($holiday) {
-    $holidayMessage = "🔔 Православный календарь\n\nСегодня праздник: *{$holiday}*";
+    $safeHoliday = BotView::escapeHtml($holiday);
+    $holidayMessage = "🔔 <b>Православный календарь</b>\n\nСегодня праздник: {$safeHoliday}";
     $stats = $newsletter->sendToAll($holidayMessage, 'праздник');
     echo "Статистика: Всего подписчиков: {$stats['total']}, Успешно отправлено: {$stats['success']}, Ошибок: {$stats['failed']}\n";
 } else {

@@ -66,8 +66,9 @@ if ($defaultMode) {
     // 1. Отправка информации о празднике (если есть)
     $holiday = $calendar->getHoliday();
     if ($holiday) {
-        $holidayMessage = "🔔 Православный календарь\n\nСегодня праздник: *$holiday*";
-        
+        $safeHoliday = BotView::escapeHtml($holiday);
+        $holidayMessage = "🔔 <b>Православный календарь</b>\n\nСегодня праздник: {$safeHoliday}";
+
         foreach ($ids as $chatId) {
             try {
                 $view->sendMessage($holidayMessage, $chatId);
@@ -84,7 +85,8 @@ if ($defaultMode) {
     // 2. Отправка цитаты из Библии
     $quote = $content->getRandomQuote();
     $quoteText = $quote['text'];
-    $quoteMessage = "📖 *Ежедневная цитата из Библии*\n\n{$quoteText}";
+    $safeQuote = BotView::escapeHtml($quoteText);
+    $quoteMessage = "📖 <b>Ежедневная цитата из Библии</b>\n\n{$safeQuote}";
 
     foreach ($ids as $chatId) {
         try {
@@ -101,7 +103,8 @@ if ($defaultMode) {
 if ($sendBible) {
     $quote = $content->getRandomQuote();
     $quoteText = $quote['text'];
-    $quoteMessage = "📖 *Цитата из Библии*\n\n{$quoteText}";
+    $safeQuote = BotView::escapeHtml($quoteText);
+    $quoteMessage = "📖 <b>Цитата из Библии</b>\n\n{$safeQuote}";
 
     foreach ($ids as $chatId) {
         try {
@@ -119,10 +122,12 @@ if ($sendSaint) {
     $quote = $content->getSaintQuote();
     $quoteText = $quote['text'];
     $quoteAuthor = $quote['name'] ?? null;
-    
-    $quoteMessage = "📿 *Цитата святого*\n\n{$quoteText}";
+    $safeQuote = BotView::escapeHtml($quoteText);
+
+    $quoteMessage = "📿 <b>Цитата святого</b>\n\n{$safeQuote}";
     if ($quoteAuthor) {
-        $quoteMessage .= "\n\n— *{$quoteAuthor}*";
+        $safeAuthor = BotView::escapeHtml($quoteAuthor);
+        $quoteMessage .= "\n\n— <b>{$safeAuthor}</b>";
     }
 
     foreach ($ids as $chatId) {

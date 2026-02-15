@@ -54,7 +54,8 @@ if (empty($quote['text'])) {
 }
 
 $quoteText = $quote['text'];
-$quoteMessage = "📖 *Ежедневная цитата из Библии*\n\n{$quoteText}";
+$safeQuote = BotView::escapeHtml($quoteText);
+$quoteMessage = "📖 <b>Ежедневная цитата из Библии</b>\n\n{$safeQuote}";
 
 // Отправляем рассылку
 $stats = $newsletter->sendToAll($quoteMessage, 'цитата из Библии');

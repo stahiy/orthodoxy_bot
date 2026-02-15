@@ -35,12 +35,11 @@ $defaultMode = !$sendBible && !$sendSaint;
 $config = require __DIR__ . '/config.php';
 
 // Загружаем данные из отдельных файлов
-$fixedHolidays = require $config['paths']['fixed_holidays_file'];
 $prayers = require $config['paths']['prayers_file'];
 $quotes = require $config['paths']['quotes_file'];
 
 // Модели
-$calendar = new CalendarModel($fixedHolidays);
+$calendar = new CalendarModel($config['paths']['holidays_json_file']);
 $subscribers = new SubscriberModel($config['paths']);
 $content = new ContentModel($prayers, $quotes);
 

@@ -1,189 +1,166 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Model;
+
+use App\Lib\PravoslavieDaysParser;
 
 class CalendarModel
 {
+    private ?array $holidaysData = null;
+
     public function __construct(
-        private array $fixedHolidays
+        private string $holidaysJsonPath
     ) {}
 
     /**
-     * Получить полное описание дня: праздник, пост, седмица.
+     * Получить полное описание дня из JSON-календаря: пост, седмица, глас, праздники.
+     * Если даты нет в JSON — парсим эту дату плюс неделю с days.pravoslavie.ru и дополняем файл.
      */
     public function getHoliday(string $date = 'now'): ?string
     {
         $dt = new \DateTime($date);
-        $md = $dt->format('m-d');
-        $year = (int)$dt->format('Y');
+        $dateKey = $dt->format('Y-m-d');
 
-        $descriptionParts = [];
+        $data = $this->loadHolidaysData();
 
-        // 1. Седмица и глас
-        $weekInfo = $this->getWeekInfo($dt, $year);
-        if ($weekInfo) {
-            $descriptionParts[] = $weekInfo;
+        if ($data === null || !isset($data[$dateKey])) {
+            $this->parseAndAppendRange($dateKey, 7);
+            $data = $this->holidaysData;
         }
 
-        // 2. Пост и трапеза
-        $fastInfo = $this->getFastInfo($dt, $year);
-        if ($fastInfo) {
-            $descriptionParts[] = $fastInfo;
-        }
-
-        // 3. Неподвижные праздники (Минея)
-        if (isset($this->fixedHolidays[$md])) {
-            $descriptionParts[] = "🗓 " . $this->fixedHolidays[$md];
-        }
-
-        // 4. Переходящие праздники (Триодь)
-        $easterTs = $this->getOrthodoxEasterTimestamp($year);
-        $currentTs = $dt->setTime(0, 0)->getTimestamp();
-        $diffDays = round(($currentTs - $easterTs) / 86400);
-
-        $movableHoliday = $this->getMovableHoliday($diffDays);
-        if ($movableHoliday) {
-            $descriptionParts[] = "🗓 " . $movableHoliday;
-        }
-
-        if (empty($descriptionParts)) {
+        if ($data === null || !isset($data[$dateKey])) {
             return null;
         }
 
-        return implode("\n\n", $descriptionParts);
-    }
-
-    private function getMovableHoliday(float $diffDays): ?string
-    {
-        return match ((int)$diffDays) {
-            -48 => 'Начало Великого поста (Чистый понедельник)',
-            -7  => 'Вход Господень в Иерусалим (Вербное Воскресенье)',
-            -3  => 'Великий Четверг (Воспоминание Тайной Вечери)',
-            -2  => 'Великая Пятница (Воспоминание Святых спасительных Страстей Господних)',
-            -1  => 'Великая Суббота',
-             0  => 'Пасха — Светлое Христово Воскресение',
-             7  => 'Неделя 2-я по Пасхе, Антипасха (Фомина неделя)',
-             9  => 'Радоница (Поминовение усопших)',
-            14  => 'Неделя 3-я по Пасхе, святых жен-мироносиц',
-            39  => 'Вознесение Господне',
-            48  => 'Троицкая родительская суббота',
-            49  => 'День Святой Троицы (Пятидесятница)',
-            50  => 'День Святого Духа',
-            default => null,
-        };
+        return $this->formatDay($data[$dateKey]);
     }
 
     /**
-     * Определение седмицы по Пятидесятнице
+     * Парсит диапазон дней (начиная с даты) и дополняет JSON-файл и кэш.
      */
-    private function getWeekInfo(\DateTime $dt, int $year): ?string
+    private function parseAndAppendRange(string $startDate, int $days): void
     {
-        $easterTs = $this->getOrthodoxEasterTimestamp($year);
-        $pentecostTs = $easterTs + (49 * 86400); // Троица = Пасха + 49 дней
-        $currentTs = $dt->setTime(0, 0)->getTimestamp();
+        $parser = new PravoslavieDaysParser();
+        $start = new \DateTimeImmutable($startDate);
+        $newData = [];
 
-        // Если дата после Троицы
-        if ($currentTs > $pentecostTs) {
-            // Разница в днях с Троицы
-            $diffPentecost = floor(($currentTs - $pentecostTs) / 86400);
-            // Седмица начинается с понедельника после Троицы? Нет, счет идет "по Пятидесятнице".
-            // Воскресенье Троицы - это 0-й день отсчета.
-            // 1-я седмица по Пятидесятнице начинается сразу.
-            $weekNum = floor($diffPentecost / 7) + 1;
-            
-            // Ограничиваем до следующего Великого Поста (грубо)
-            if ($weekNum > 0 && $weekNum < 40) {
-                return "Седмица {$weekNum}-я по Пятидесятнице.";
+        for ($i = 0; $i < $days; $i++) {
+            $d = $start->modify("+{$i} days")->format('Y-m-d');
+            $day = $parser->parseDay($d);
+            $newData[$day['date']] = $day;
+        }
+
+        $existing = $this->holidaysData ?? [];
+        if ($this->holidaysData === null && is_readable($this->holidaysJsonPath)) {
+            $json = file_get_contents($this->holidaysJsonPath);
+            if ($json !== false) {
+                $decoded = json_decode($json, true);
+                $existing = is_array($decoded) ? $decoded : [];
             }
         }
-        
-        return null;
+
+        $merged = array_merge($existing, $newData);
+        ksort($merged);
+
+        $dir = dirname($this->holidaysJsonPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $written = file_put_contents(
+            $this->holidaysJsonPath,
+            json_encode($merged, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        );
+
+        if ($written !== false) {
+            $this->holidaysData = $merged;
+        }
+    }
+
+    /** @var array<int, string> Месяцы по-русски (1–12) */
+    private static array $monthsRu = [
+        1 => 'января', 2 => 'февраля', 3 => 'марта', 4 => 'апреля', 5 => 'мая', 6 => 'июня',
+        7 => 'июля', 8 => 'августа', 9 => 'сентября', 10 => 'октября', 11 => 'ноября', 12 => 'декабря',
+    ];
+
+    /**
+     * Форматирует дату Y-m-d в читаемый вид (например: «1 февраля» или «19 января (по старому стилю)»).
+     */
+    private function formatDate(string $dateStr, bool $oldStyle = false): string
+    {
+        $dt = \DateTimeImmutable::createFromFormat('Y-m-d', $dateStr);
+        if ($dt === false) {
+            return $dateStr . ($oldStyle ? ' (по старому стилю)' : '');
+        }
+        $day = (int) $dt->format('j');
+        $month = (int) $dt->format('n');
+        $monthName = self::$monthsRu[$month] ?? $dt->format('m');
+        $suffix = $oldStyle ? ' (по старому стилю)' : '';
+        return "{$day} {$monthName}{$suffix}";
     }
 
     /**
-     * Определение поста и правил трапезы
+     * Форматирует запись дня в строку для бота.
      */
-    private function getFastInfo(\DateTime $dt, int $year): ?string
+    private function formatDay(array $day): ?string
     {
-        $md = $dt->format('m-d');
-        $currentTs = $dt->setTime(0, 0)->getTimestamp();
-        $easterTs = $this->getOrthodoxEasterTimestamp($year);
-        $dayOfWeek = (int)$dt->format('N'); // 1 - Пн, 7 - Вс
+        $parts = [];
 
-        // --- Рождественский пост (28 ноя - 6 янв) ---
-        // Учитываем переход года. Если сейчас январь, смотрим пост начавшийся в прошлом году.
-        // Проще проверить диапазоны.
-        $isChristmasFast = 
-            ($md >= '11-28' && $md <= '12-31') || 
-            ($md >= '01-01' && $md <= '01-06');
-
-        if ($isChristmasFast) {
-            $food = "Постный день.";
-            // Упрощенные правила: Рыба разрешена в Сб и Вс, и в праздники
-            if ($dayOfWeek === 6 || $dayOfWeek === 7 || $md === '12-04' || $md === '12-19') {
-                $food .= " Разрешается рыба.";
-            } elseif ($dayOfWeek === 2 || $dayOfWeek === 4) {
-                $food .= " Пища с маслом.";
-            } else {
-                $food .= " Сухоядение или пища без масла (монастырский устав).";
-            }
-            
-            // Строгие дни предпразднства (2-6 января)
-            if ($md >= '01-02' && $md <= '01-06') {
-                $food = "Строгий пост перед Рождеством.";
-            }
-
-            return "Рождественский пост. " . $food;
+        $dateNew = !empty($day['date']) ? $this->formatDate($day['date'], false) : null;
+        $dateOld = !empty($day['dateOldStyle']) ? $this->formatDate($day['dateOldStyle'], true) : null;
+        if ($dateNew !== null && $dateOld !== null) {
+            $parts[] = "{$dateNew} / {$dateOld}";
+        } elseif ($dateNew !== null) {
+            $parts[] = $dateNew;
+        } elseif ($dateOld !== null) {
+            $parts[] = $dateOld;
+        }
+        if (!empty($day['fastInfo'])) {
+            $parts[] = $day['fastInfo'];
+        }
+        if (!empty($day['weekName'])) {
+            $parts[] = $day['weekName'];
+        }
+        if (!empty($day['voice'])) {
+            $parts[] = $day['voice'];
+        }
+        if (!empty($day['feasts']) && is_array($day['feasts'])) {
+            $parts[] = '🗓 ' . implode("\n\n", $day['feasts']);
         }
 
-        // --- Успенский пост (14 авг - 27 авг) ---
-        if ($md >= '08-14' && $md <= '08-27') {
-            $food = ($md === '08-19') ? "Разрешается рыба (Преображение)." : "Строгий пост.";
-            return "Успенский пост. " . $food;
+        if (empty($parts)) {
+            return null;
         }
 
-        // --- Петров пост (через неделю после Троицы до 11 июля) ---
-        // Троица + 8 дней = Начало поста
-        $pentecostTs = $easterTs + (49 * 86400);
-        $petrovStart = $pentecostTs + (8 * 86400); 
-        // Конец 11 июля (фиксированный)
-        $petrovEnd = mktime(0, 0, 0, 7, 11, $year);
-
-        if ($currentTs >= $petrovStart && $currentTs <= $petrovEnd) {
-            return "Петров пост. Разрешается рыба (кроме среды и пятницы).";
-        }
-
-        // --- Великий пост (за 48 дней до Пасхи) ---
-        $diffEaster = ($currentTs - $easterTs) / 86400;
-        if ($diffEaster >= -48 && $diffEaster < 0) {
-            return "Великий пост. Строгое воздержание.";
-        }
-
-        // --- Среда и Пятница (если нет поста и не сплошная седмица) ---
-        // Проверка на сплошные седмицы (Святки, Светлая, Троицкая и т.д.) опущена для краткости,
-        // но базовое правило среды и пятницы добавим.
-        if (!$isChristmasFast && ($dayOfWeek === 3 || $dayOfWeek === 5)) {
-            // Исключения (Святки 7-17 янв)
-            if (!($md >= '01-07' && $md <= '01-17')) {
-                return "Постный день (Среда/Пятница).";
-            }
-        }
-
-        return null;
+        return implode("\n\n", $parts);
     }
 
     /**
-     * Расчет Пасхи (Александрийская пасхалия)
+     * Загружает и кэширует данные из JSON-файла календаря.
      */
-    private function getOrthodoxEasterTimestamp(int $year): int
+    private function loadHolidaysData(): ?array
     {
-        $a = $year % 19;
-        $b = $year % 4;
-        $c = $year % 7;
-        $d = (19 * $a + 15) % 30;
-        $e = (2 * $b + 4 * $c + 6 * $d + 6) % 7;
-        $f = $d + $e;
-        $day = 4 + $f;
-        return mktime(0, 0, 0, 4, $day + 13, $year);
+        if ($this->holidaysData !== null) {
+            return $this->holidaysData;
+        }
+
+        if (!is_readable($this->holidaysJsonPath)) {
+            return null;
+        }
+
+        $json = file_get_contents($this->holidaysJsonPath);
+        if ($json === false) {
+            return null;
+        }
+
+        $decoded = json_decode($json, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        $this->holidaysData = $decoded;
+        return $this->holidaysData;
     }
 }

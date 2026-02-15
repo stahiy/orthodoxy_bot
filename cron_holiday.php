@@ -24,11 +24,8 @@ require __DIR__ . '/vendor/autoload.php';
 // Загружаем конфиг
 $config = require __DIR__ . '/config.php';
 
-// Загружаем данные о праздниках
-$fixedHolidays = require $config['paths']['fixed_holidays_file'];
-
 // Инициализация моделей
-$calendar = new CalendarModel($fixedHolidays);
+$calendar = new CalendarModel($config['paths']['holidays_json_file']);
 $subscribers = new SubscriberModel($config['paths']);
 
 // Инициализация бота

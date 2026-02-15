@@ -4,8 +4,9 @@
 
 ## Структура
 
-- `parse_quotes.php` - основной скрипт парсинга
+- `parse_quotes.php` - основной скрипт парсинга цитат с azbyka.ru
 - `parse_quotes_debug.php` - отладочный скрипт для анализа структуры HTML
+- `parse_day_pravoslavie.php` - парсер страницы дня с [days.pravoslavie.ru](https://days.pravoslavie.ru/) (календарь: пост, неделя, глас, праздники)
 - `README.md` - данная инструкция
 
 ## Использование
@@ -92,6 +93,42 @@ return [
 - Расширение `curl`
 - Расширение `dom` (для DOMDocument)
 - Расширение `mbstring` (для работы с UTF-8)
+
+## Парсер дня (days.pravoslavie.ru)
+
+Класс `App\Lib\PravoslavieDaysParser` загружает страницу дня вида `https://days.pravoslavie.ru/Days/YYYYMMDD.html` и извлекает:
+
+- **Пост** — статус трапезы (например, «Поста нет. Заговенье на мясо.»)
+- **Неделя** — название недели по календарю (например, «Неделя о Страшнем суде»)
+- **Глас** — глас Октоиха (например, «Глас 3.»)
+- **Праздники** — список праздников и памятей дня
+
+### Использование CLI
+
+```bash
+# Сегодня
+php parsing/parse_day_pravoslavie.php
+
+# Указанная дата
+php parsing/parse_day_pravoslavie.php 2026-02-02
+
+# Вывод в JSON
+php parsing/parse_day_pravoslavie.php 2026-02-02 --json
+```
+
+Требуется `composer install` (автозагрузка для `App\Lib\PravoslavieDaysParser`).
+
+### Использование в коде
+
+```php
+use App\Lib\PravoslavieDaysParser;
+
+$parser = new PravoslavieDaysParser();
+$result = $parser->parseDay('2026-02-02');
+// $result: ['date' => '...', 'fastInfo' => '...', 'weekName' => '...', 'voice' => '...', 'feasts' => [...]]
+
+$text = $parser->formatDayAsText($result); // Готовый текст для бота
+```
 
 ## Примечания
 

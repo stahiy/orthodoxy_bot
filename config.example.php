@@ -16,6 +16,7 @@ return [
     'paths' => [
         'storage' => __DIR__ . '/storage',
         'subscribers_file' => 'subscribers.json',
+        'holidays_json_file' => __DIR__ . '/storage/holidays_next_week.json',
     ],
     // Молитвы: Заголовок -> Текст (или просто текст)
     'prayers' => [

@@ -67,7 +67,7 @@ if ($defaultMode) {
     $holiday = $calendar->getHoliday();
     if ($holiday) {
         $safeHoliday = BotView::escapeHtml($holiday);
-        $holidayMessage = "🔔 <b>Православный календарь</b>\n\nСегодня праздник: {$safeHoliday}";
+        $holidayMessage = "🔔 <b>Православный календарь</b>\n\n{$safeHoliday}";
 
         foreach ($ids as $chatId) {
             try {

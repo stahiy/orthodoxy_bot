@@ -37,7 +37,10 @@ class BotView
     {
         if ($holiday) {
             $safe = self::escapeHtml($holiday);
-            $this->bot->sendMessage(text: "📅 Сегодня: <b>{$safe}</b>", parse_mode: 'HTML');
+            $this->bot->sendMessage(
+                text: "🔔 <b>Православный календарь</b>\n\n{$safe}",
+                parse_mode: 'HTML'
+            );
         } else {
             $this->bot->sendMessage(text: "Сегодня нет великих двунадесятых праздников.");
         }
@@ -47,7 +50,10 @@ class BotView
     {
         $safeTitle = self::escapeHtml($title);
         $safeText = self::escapeHtml($text);
-        $this->bot->sendMessage(text: "🙏 <b>{$safeTitle}</b>\n\n{$safeText}", parse_mode: 'HTML');
+        $this->bot->sendMessage(
+            text: "🙏 <b>Молитва</b>\n\n<b>{$safeTitle}</b>\n\n{$safeText}",
+            parse_mode: 'HTML'
+        );
     }
 
     /**
